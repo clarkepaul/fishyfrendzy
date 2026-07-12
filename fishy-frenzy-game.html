@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fishy Frenzy</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #052226;
+    font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;
+  }
+  #gameContainer { position: relative; width: 100vw; height: 100vh; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  #hud {
+    position: absolute; top: 14px; left: 14px;
+    color: #FFF7EC; text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    font-size: 16px; pointer-events: none; z-index: 5;
+  }
+  #scoreWrap { text-align: left; }
+  #scoreLabel { font-size: 13px; letter-spacing: 1px; color: #9fd6d2; }
+  #scoreVal {
+    display: block; font-weight: 800; color: #FFD98A;
+    font-size: 28px; transition: font-size 0.25s ease;
+  }
+  #livesWrap { margin-top: 6px; font-size: 20px; }
+
+  #warning, #challengeBanner, #bossBar {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    z-index: 6; text-align: center; pointer-events: none;
+  }
+  #warning {
+    top: 14px; color: #FF6B4A; font-size: 20px; font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.7); opacity: 0; transition: opacity 0.2s;
+  }
+  #challengeBanner {
+    top: 60px; background: rgba(20,60,65,0.85); border: 2px solid #FFD98A;
+    border-radius: 16px; padding: 8px 20px; color: #FFF7EC; font-size: 15px;
+    opacity: 0; transition: opacity 0.25s; max-width: 90vw;
+  }
+  #challengeBanner .ctitle { color: #F5D76E; font-weight: bold; font-size: 16px; }
+  #bossBar {
+    top: 14px; width: 60vw; max-width: 420px; opacity: 0; transition: opacity 0.3s;
+  }
+  #bossBarOuter {
+    background: rgba(0,0,0,0.4); border: 2px solid #FFD98A; border-radius: 10px;
+    height: 20px; overflow: hidden;
+  }
+  #bossBarInner { height: 100%; background: linear-gradient(90deg,#8B2FA0,#FF6B4A); width: 100%; }
+  #bossLabel { color: #FFD98A; font-size: 13px; font-weight: bold; margin-bottom: 3px; }
+
+  #startScreen, #gameOverScreen, #victoryScreen {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 40%, rgba(15,90,95,0.95), rgba(3,25,28,0.98));
+    color: #FFF7EC; text-align: center; z-index: 20; padding: 20px; box-sizing: border-box;
+  }
+  #gameOverScreen, #victoryScreen { display: none; }
+  h1 { font-size: 44px; margin: 0 0 6px 0; color: #FFD98A; text-shadow: 0 4px 0 #053E41; }
+  h2 { font-size: 24px; margin: 0 0 14px 0; color: #FF8A66; }
+  p.sub { font-size: 15px; color: #cfeceb; max-width: 460px; line-height: 1.5; margin-bottom: 18px; }
+  button {
+    font-size: 20px; font-weight: bold; padding: 12px 30px; border-radius: 30px;
+    border: none; background: linear-gradient(#FFA55C, #FF6B4A); color: #3a1608;
+    cursor: pointer; box-shadow: 0 6px 0 #B8431F; transition: transform 0.05s;
+  }
+  button:active { transform: translateY(4px); box-shadow: 0 2px 0 #B8431F; }
+  #controls { margin-top: 18px; font-size: 13px; color: #9fd6d2; }
+
+  /* On-screen D-pad */
+  #dpad {
+    position: absolute; bottom: 26px; left: 26px; z-index: 15;
+    width: 150px; height: 150px;
+    display: grid; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px;
+    gap: 0;
+  }
+  .dbtn {
+    background: rgba(255,247,236,0.15); border: 2px solid rgba(255,217,138,0.6);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    color: #FFF7EC; font-size: 22px; -webkit-tap-highlight-color: transparent;
+  }
+  .dbtn.active { background: rgba(255,217,138,0.55); }
+  #dUp { grid-column: 2; grid-row: 1; }
+  #dLeft { grid-column: 1; grid-row: 2; }
+  #dRight { grid-column: 3; grid-row: 2; }
+  #dDown { grid-column: 2; grid-row: 3; }
+
+  @media (min-width: 900px) and (pointer: fine) {
+    #dpad { opacity: 0.55; }
+  }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">
+    <div id="scoreWrap">
+      <span id="scoreLabel">SCORE</span>
+      <span id="scoreVal">0</span>
+      <div id="livesWrap">❤️❤️❤️</div>
+    </div>
+  </div>
+
+  <div id="warning">⚠ SQUID NEARBY ⚠</div>
+  <div id="challengeBanner">
+    <div class="ctitle" id="challengeTitle"></div>
+    <div id="challengeSub"></div>
+  </div>
+  <div id="bossBar">
+    <div id="bossLabel">SQUID BOSS</div>
+    <div id="bossBarOuter"><div id="bossBarInner"></div></div>
+  </div>
+
+  <div id="dpad">
+    <div class="dbtn" id="dUp">▲</div>
+    <div class="dbtn" id="dLeft">◀</div>
+    <div class="dbtn" id="dRight">▶</div>
+    <div class="dbtn" id="dDown">▼</div>
+  </div>
+
+  <div id="startScreen">
+    <h1>🐟 FISHY FRENZY 🐟</h1>
+    <h2>Eat. Grow. Survive.</h2>
+    <p class="sub">Guide your fish with the arrows, WASD, on-screen arrows, or by touching/clicking the water.
+    Eat food and smaller creatures to grow. Your seahorse friend swims with you and shields you once in a while.
+    Watch for the disco fish — complete its challenge for bonus points. Grow big enough, and the squid will come for you.</p>
+    <button id="startBtn">Start Swimming</button>
+    <div id="controls">Arrow keys / WASD / on-screen arrows / tap-drag the water</div>
+  </div>
+
+  <div id="gameOverScreen">
+    <h1 id="goTitle">Eaten!</h1>
+    <p class="sub" id="goMessage"></p>
+    <p class="sub" style="font-size:18px; color:#FFD98A; margin-top:-8px;">Final score: <span id="finalScore">0</span></p>
+    <button id="retryBtn">Swim Again</button>
+  </div>
+
+  <div id="victoryScreen">
+    <h1>🏆 Squid Defeated! 🏆</h1>
+    <p class="sub" id="victoryMessage"></p>
+    <p class="sub" style="font-size:18px; color:#FFD98A; margin-top:-8px;">Final score: <span id="victoryScore">0</span></p>
+    <button id="victoryRetryBtn">Play Again</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+const WORLD_W = 3200, WORLD_H = 2200;
+function rand(a,b){ return Math.random()*(b-a)+a; }
+function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+function lerp(a,b,t){ return a + (b-a)*t; }
+
+// ---------------- Input ----------------
+const keys = {};
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function bindDpad(id, key) {
+  const el = document.getElementById(id);
+  const on = (e) => { e.preventDefault(); keys[key] = true; el.classList.add('active'); };
+  const off = (e) => { keys[key] = false; el.classList.remove('active'); };
+  el.addEventListener('touchstart', on, {passive:false});
+  el.addEventListener('touchend', off);
+  el.addEventListener('touchcancel', off);
+  el.addEventListener('mousedown', on);
+  el.addEventListener('mouseup', off);
+  el.addEventListener('mouseleave', off);
+}
+bindDpad('dUp','arrowup'); bindDpad('dDown','arrowdown');
+bindDpad('dLeft','arrowleft'); bindDpad('dRight','arrowright');
+
+let pointerActive = false;
+let pointerWorld = null;
+function screenToWorld(sx, sy) { return { x: sx + camera.x, y: sy + camera.y }; }
+canvas.addEventListener('mousedown', e => { pointerActive = true; pointerWorld = screenToWorld(e.clientX, e.clientY); });
+canvas.addEventListener('mousemove', e => { if (pointerActive) pointerWorld = screenToWorld(e.clientX, e.clientY); });
+window.addEventListener('mouseup', () => pointerActive = false);
+canvas.addEventListener('touchstart', e => {
+  pointerActive = true;
+  const t = e.touches[0];
+  pointerWorld = screenToWorld(t.clientX, t.clientY);
+}, {passive:true});
+canvas.addEventListener('touchmove', e => {
+  if (pointerActive) {
+    const t = e.touches[0];
+    pointerWorld = screenToWorld(t.clientX, t.clientY);
+  }
+}, {passive:true});
+canvas.addEventListener('touchend', () => pointerActive = false);
+
+// ---------------- Particles ----------------
+let particles = [];
+function spawnSparkles(x, y, count, color) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y, vx: rand(-2.2,2.2), vy: rand(-2.8,-0.6),
+      life: rand(24,48), maxLife: 48, size: rand(2,5),
+      color: color || ['#FFD98A','#FFF7EC','#FF8A66'][Math.floor(rand(0,3))]
+    });
+  }
+}
+function updateParticles() {
+  for (let i = particles.length-1; i>=0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life--;
+    if (p.life <= 0) particles.splice(i,1);
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    const sx = p.x - camera.x, sy = p.y - camera.y;
+    ctx.globalAlpha = clamp(p.life / p.maxLife, 0, 1);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(sx, sy, p.size, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------------- Bubbles ----------------
+let bubbles = [];
+function initBubbles() {
+  bubbles = [];
+  for (let i=0;i<70;i++) bubbles.push({ x: rand(0,WORLD_W), y: rand(0,WORLD_H), r: rand(2,8), speed: rand(0.2,0.6) });
+}
+
+// ---------------- Player ----------------
+let player, lives, invincibleTimer, shieldReady, shieldCooldown;
+function initPlayer() {
+  player = { x: WORLD_W/2, y: WORLD_H/2, vx:0, vy:0, angle:0, size:16, baseSpeed:3.8 };
+  lives = 3; invincibleTimer = 0; shieldReady = true; shieldCooldown = 0;
+}
+
+// ---------------- Seahorse companion ----------------
+let seahorse;
+function initSeahorse() { seahorse = { x: player.x-40, y: player.y-20, angle:0, bob:0 }; }
+function updateSeahorse() {
+  const targetX = player.x - Math.cos(player.angle)*(player.size+35);
+  const targetY = player.y - Math.sin(player.angle)*(player.size+35) - 10;
+  seahorse.x = lerp(seahorse.x, targetX, 0.08);
+  seahorse.y = lerp(seahorse.y, targetY, 0.08);
+  seahorse.bob += 0.08;
+  if (!shieldReady) {
+    shieldCooldown--;
+    if (shieldCooldown <= 0) { shieldReady = true; spawnSparkles(seahorse.x, seahorse.y, 10, '#7FD8D3'); }
+  }
+}
+function drawSeahorse() {
+  const sx = seahorse.x-camera.x, sy = seahorse.y-camera.y + Math.sin(seahorse.bob)*4;
+  ctx.save(); ctx.translate(sx,sy);
+  ctx.fillStyle = shieldReady ? '#7FD8D3' : '#4a8f8c';
+  ctx.beginPath(); ctx.ellipse(0,0,10,16,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(2,-14,6,8,0.3,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#053E41';
+  ctx.beginPath(); ctx.arc(5,-16,2,0,Math.PI*2); ctx.fill();
+  if (shieldReady) {
+    ctx.strokeStyle = 'rgba(127,216,211,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0,0,20,0,Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------------- Food ----------------
+let foods = [];
+function spawnFood() { foods.push({ x: rand(0,WORLD_W), y: rand(0,WORLD_H), size: rand(3,5), color: ['#F5D76E','#8ED1FC','#B5EAD7'][Math.floor(rand(0,3))] }); }
+function initFood() { foods = []; for (let i=0;i<90;i++) spawnFood(); }
+
+// ---------------- Creatures ----------------
+let creatures = [];
+const PREY_COLORS = ['#7FD8D3','#B5EAD7','#8ED1FC','#C7A0FF'];
+const PRED_COLORS = ['#FF6B4A','#B8431F','#8B2FA0'];
+function spawnCreature() {
+  const isPredator = Math.random() < 0.35;
+  const size = isPredator ? rand(30,70) : rand(8,26);
+  let x,y,tries=0;
+  do { x = rand(0,WORLD_W); y = rand(0,WORLD_H); tries++; } while (dist({x,y},player) < 350 && tries < 15);
+  creatures.push({
+    x,y,size,isPredator,
+    color: isPredator ? PRED_COLORS[Math.floor(rand(0,PRED_COLORS.length))] : PREY_COLORS[Math.floor(rand(0,PREY_COLORS.length))],
+    angle: rand(0,Math.PI*2), speed: rand(0.5,1.6)*(isPredator?0.8:1.3),
+    wanderTimer: rand(0,100), fleeing:false, hunting:false
+  });
+}
+function initCreatures() { creatures = []; for (let i=0;i<38;i++) spawnCreature(); }
+
+// ---------------- Disco fish ----------------
+let discoFish = null, challenge = null, discoRespawnTimer = 200;
+function spawnDiscoFish() {
+  let x,y,tries=0;
+  do { x = rand(0,WORLD_W); y = rand(0,WORLD_H); tries++; } while (dist({x,y},player) < 300 && tries < 15);
+  discoFish = { x,y, angle: rand(0,Math.PI*2), speed: 1.4, wanderTimer: 0, hue: 0 };
+}
+function startChallenge() {
+  const types = ['eatFood','eatPrey'];
+  const type = types[Math.floor(rand(0,types.length))];
+  challenge = { type, target: type==='eatFood'?8:4, progress:0, timeLeft: 12*60, reward: 250 };
+  showChallengeBanner();
+}
+function showChallengeBanner() {
+  const el = document.getElementById('challengeBanner');
+  document.getElementById('challengeTitle').textContent = "Disco Fish Challenge!";
+  document.getElementById('challengeSub').textContent = challenge.type === 'eatFood'
+    ? `Eat ${challenge.target} food bits before time runs out!`
+    : `Eat ${challenge.target} small creatures before time runs out!`;
+  el.style.opacity = '1';
+}
+function updateChallengeBanner() {
+  const el = document.getElementById('challengeBanner');
+  if (!challenge) { el.style.opacity = '0'; return; }
+  document.getElementById('challengeSub').textContent =
+    (challenge.type==='eatFood' ? `Food eaten: ` : `Creatures eaten: `) +
+    `${challenge.progress}/${challenge.target}  ·  ${Math.ceil(challenge.timeLeft/60)}s left`;
+}
+
+// ---------------- Squid boss ----------------
+let squid, squidDefeated = false, bossMode = false;
+const SQUID_TRIGGER_SIZE = 110, SQUID_MAX_HEALTH = 5;
+function initSquid() {
+  squid = {
+    x: rand(0,WORLD_W), y: rand(0,WORLD_H), angle:0, size:95,
+    speed:1.6, huntSpeed:3.0, tentaclePhase:0, state:'roam',
+    roamTarget: { x: rand(0,WORLD_W), y: rand(0,WORLD_H) },
+    health: SQUID_MAX_HEALTH, attackTimer: 90, attackTelegraph:false, telegraphTimer:0,
+    tentacleHitX:0, tentacleHitY:0, tentacleReach:0
+  };
+}
+
+// ---------------- Score / camera / state ----------------
+let score = 0, camera = { x:0, y:0 }, gameRunning = false, frame = 0;
+function addScore(v) {
+  score += v;
+  const el = document.getElementById('scoreVal');
+  el.textContent = Math.floor(score);
+  el.style.fontSize = clamp(28 + score/400, 28, 46) + 'px';
+}
+function updateLivesDisplay() { document.getElementById('livesWrap').textContent = '❤️'.repeat(Math.max(0,lives)); }
+
+function startGame() {
+  initPlayer(); initSeahorse(); initFood(); initCreatures(); initSquid(); initBubbles();
+  score = 0; frame = 0; discoFish = null; challenge = null; discoRespawnTimer = 240;
+  squidDefeated = false; bossMode = false;
+  addScore(0); updateLivesDisplay();
+  gameRunning = true;
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('victoryScreen').style.display = 'none';
+  document.getElementById('bossBar').style.opacity = '0';
+  document.getElementById('challengeBanner').style.opacity = '0';
+  requestAnimationFrame(loop);
+}
+function endGame(message) {
+  gameRunning = false;
+  document.getElementById('goMessage').textContent = message;
+  document.getElementById('finalScore').textContent = Math.floor(score);
+  document.getElementById('gameOverScreen').style.display = 'flex';
+}
+function winGame(message) {
+  gameRunning = false;
+  document.getElementById('victoryMessage').textContent = message;
+  document.getElementById('victoryScore').textContent = Math.floor(score);
+  document.getElementById('victoryScreen').style.display = 'flex';
+}
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+document.getElementById('victoryRetryBtn').addEventListener('click', startGame);
+
+// ---------------- Update: player ----------------
+function updatePlayer() {
+  let dx=0, dy=0, usedKeys=false;
+  if (keys['arrowup']||keys['w']) { dy-=1; usedKeys=true; }
+  if (keys['arrowdown']||keys['s']) { dy+=1; usedKeys=true; }
+  if (keys['arrowleft']||keys['a']) { dx-=1; usedKeys=true; }
+  if (keys['arrowright']||keys['d']) { dx+=1; usedKeys=true; }
+  if (!usedKeys && pointerActive && pointerWorld) {
+    const ddx = pointerWorld.x-player.x, ddy = pointerWorld.y-player.y;
+    const d = Math.hypot(ddx,ddy);
+    if (d > 4) { dx = ddx/d; dy = ddy/d; }
+  }
+  const len = Math.hypot(dx,dy);
+  if (len > 0) { dx/=len; dy/=len; player.angle = Math.atan2(dy,dx); }
+  const speedFactor = clamp(1.15 - player.size/300, 0.5, 1.15);
+  const speed = player.baseSpeed * speedFactor;
+  player.vx = dx*speed; player.vy = dy*speed;
+  player.x = clamp(player.x+player.vx, player.size, WORLD_W-player.size);
+  player.y = clamp(player.y+player.vy, player.size, WORLD_H-player.size);
+  if (invincibleTimer > 0) invincibleTimer--;
+}
+function damagePlayer(msg) {
+  if (invincibleTimer > 0) return;
+  if (shieldReady) {
+    shieldReady = false; shieldCooldown = 300; invincibleTimer = 60;
+    spawnSparkles(player.x, player.y, 20, '#7FD8D3');
+    return;
+  }
+  lives--; updateLivesDisplay(); invincibleTimer = 90;
+  spawnSparkles(player.x, player.y, 16, '#FF6B4A');
+  if (lives <= 0) endGame(msg);
+}
+
+// ---------------- Update: food ----------------
+function updateFood() {
+  for (let i = foods.length-1; i>=0; i--) {
+    const f = foods[i];
+    if (dist(f,player) < player.size*0.8 + f.size) {
+      player.size += 0.6; addScore(5); spawnSparkles(f.x,f.y,6);
+      foods.splice(i,1); spawnFood();
+      if (challenge && challenge.type === 'eatFood') challenge.progress++;
+    }
+  }
+}
+
+// ---------------- Update: creatures ----------------
+function updateCreatures() {
+  for (const c of creatures) {
+    c.wanderTimer--;
+    const d = dist(c, player);
+    if (!c.isPredator) {
+      const playerBigger = player.size > c.size*1.05;
+      if (playerBigger && d < 160) { c.fleeing=true; c.angle = Math.atan2(c.y-player.y, c.x-player.x); c.wanderTimer=30; }
+      else if (c.wanderTimer <= 0) { c.angle += rand(-1,1); c.wanderTimer = rand(40,100); c.fleeing=false; }
+    } else {
+      const predatorBigger = c.size > player.size*1.1;
+      if (predatorBigger && d < 320) { c.hunting = true; c.angle = Math.atan2(player.y-c.y, player.x-c.x); }
+      else if (d > 500 || !predatorBigger) { c.hunting=false; if (c.wanderTimer<=0){ c.angle += rand(-1,1); c.wanderTimer = rand(40,100);} }
+    }
+    const spd = (c.fleeing||c.hunting) ? c.speed*1.7 : c.speed;
+    c.x += Math.cos(c.angle)*spd; c.y += Math.sin(c.angle)*spd;
+    c.x = clamp(c.x, c.size, WORLD_W-c.size); c.y = clamp(c.y, c.size, WORLD_H-c.size);
+  }
+  for (let i = creatures.length-1; i>=0; i--) {
+    const c = creatures[i];
+    const d = dist(c, player);
+    if (d < player.size*0.85 + c.size*0.5) {
+      if (player.size > c.size*1.08) {
+        player.size += c.size*0.15; addScore(c.isPredator?40:15);
+        spawnSparkles(c.x,c.y,10,c.color); creatures.splice(i,1); spawnCreature();
+        if (challenge && challenge.type === 'eatPrey' && !c.isPredator) challenge.progress++;
+      } else if (c.size > player.size*1.15) {
+        creatures.splice(i,1); spawnCreature();
+        damagePlayer('A hungry predator got you! Grow bigger before wandering near the big ones.');
+      }
+    }
+  }
+  while (creatures.length < 34) spawnCreature();
+}
+
+// ---------------- Update: disco fish / challenge ----------------
+function updateDiscoFish() {
+  if (!discoFish) {
+    discoRespawnTimer--;
+    if (discoRespawnTimer <= 0 && !challenge) spawnDiscoFish();
+    return;
+  }
+  discoFish.hue = (discoFish.hue+4)%360;
+  discoFish.wanderTimer--;
+  if (discoFish.wanderTimer <= 0) { discoFish.angle += rand(-1,1); discoFish.wanderTimer = rand(50,100); }
+  discoFish.x += Math.cos(discoFish.angle)*discoFish.speed;
+  discoFish.y += Math.sin(discoFish.angle)*discoFish.speed;
+  discoFish.x = clamp(discoFish.x, 20, WORLD_W-20);
+  discoFish.y = clamp(discoFish.y, 20, WORLD_H-20);
+  if (!challenge && dist(discoFish, player) < player.size+24) {
+    startChallenge(); discoFish = null; discoRespawnTimer = 500;
+  }
+}
+function updateChallenge() {
+  if (!challenge) return;
+  challenge.timeLeft--;
+  if (challenge.progress >= challenge.target) {
+    addScore(challenge.reward); spawnSparkles(player.x, player.y, 26, '#F5D76E');
+    challenge = null; document.getElementById('challengeBanner').style.opacity = '0';
+  } else if (challenge.timeLeft <= 0) {
+    challenge = null; document.getElementById('challengeBanner').style.opacity = '0';
+  } else {
+    updateChallengeBanner();
+  }
+}
+
+// ---------------- Update: squid ----------------
+function updateSquid() {
+  const d = dist(squid, player);
+  if (!bossMode && player.size >= SQUID_TRIGGER_SIZE && !squidDefeated) {
+    bossMode = true;
+    document.getElementById('bossBar').style.opacity = '1';
+  }
+  if (bossMode) squid.state = 'hunt';
+  else if (d < 550) squid.state = 'hunt';
+  else if (d > 900) squid.state = 'roam';
+
+  if (squid.state === 'hunt') {
+    const desiredDist = bossMode ? 140 : 0;
+    const away = d < desiredDist;
+    squid.angle = Math.atan2(player.y-squid.y, player.x-squid.x);
+    const spd = bossMode ? (away ? -squid.huntSpeed*0.6 : squid.huntSpeed) : squid.huntSpeed;
+    squid.x += Math.cos(squid.angle)*spd; squid.y += Math.sin(squid.angle)*spd;
+  } else {
+    if (dist(squid, squid.roamTarget) < 60) squid.roamTarget = { x: rand(200,WORLD_W-200), y: rand(200,WORLD_H-200) };
+    squid.angle = Math.atan2(squid.roamTarget.y-squid.y, squid.roamTarget.x-squid.x);
+    squid.x += Math.cos(squid.angle)*squid.speed; squid.y += Math.sin(squid.angle)*squid.speed;
+  }
+  squid.x = clamp(squid.x, squid.size, WORLD_W-squid.size);
+  squid.y = clamp(squid.y, squid.size, WORLD_H-squid.size);
+  squid.tentaclePhase += 0.12;
+
+  document.getElementById('warning').style.opacity = (!bossMode && d < 500) ? '1' : '0';
+
+  if (bossMode) {
+    squid.attackTimer--;
+    if (squid.attackTimer <= 0 && !squid.attackTelegraph) {
+      squid.attackTelegraph = true; squid.telegraphTimer = 45;
+      squid.tentacleHitX = player.x; squid.tentacleHitY = player.y;
+    }
+    if (squid.attackTelegraph) {
+      squid.telegraphTimer--;
+      squid.tentacleReach = lerp(squid.tentacleReach, squid.size*2.2, 0.15);
+      if (squid.telegraphTimer <= 0) {
+        const hitDist = dist({x:squid.tentacleHitX,y:squid.tentacleHitY}, player);
+        if (hitDist < 70) damagePlayer("The squid's tentacle got you! Watch for the glowing warning before it strikes.");
+        squid.attackTelegraph = false; squid.tentacleReach = 0; squid.attackTimer = 110;
+      }
+    }
+    if (squid.attackTelegraph && d < player.size+squid.size*0.5 && player.size > 70) {
+      squid.health -= 0.04; spawnSparkles(squid.x, squid.y, 3, '#8B2FA0');
+    }
+    const pct = clamp(squid.health/SQUID_MAX_HEALTH, 0, 1);
+    document.getElementById('bossBarInner').style.width = (pct*100)+'%';
+    if (squid.health <= 0 && !squidDefeated) {
+      squidDefeated = true; addScore(1000);
+      spawnSparkles(squid.x, squid.y, 60, '#FFD98A');
+      winGame('Your fish grew big and brave enough to drive off the squid for good!');
+    }
+  } else {
+    if (d < player.size*0.8 + squid.size*0.55) {
+      damagePlayer("The squid got you! It's always bigger than you at first — grow more before facing it.");
+    }
+  }
+}
+
+function updateCamera() {
+  camera.x = clamp(player.x - W/2, 0, WORLD_W-W);
+  camera.y = clamp(player.y - H/2, 0, WORLD_H-H);
+}
+
+// ---------------- Draw ----------------
+function drawBackground() {
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#0E7E82'); grad.addColorStop(1,'#052226');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  for (const b of bubbles) {
+    b.y -= b.speed; if (b.y < -10) b.y = WORLD_H+10;
+    const sx = b.x-camera.x, sy = b.y-camera.y;
+    if (sx>-20 && sx<W+20 && sy>-20 && sy<H+20) {
+      ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.arc(sx,sy,b.r,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    }
+  }
+}
+function drawFishShape(x,y,size,angle,bodyColor,finColor) {
+  ctx.save(); ctx.translate(x,y); ctx.rotate(angle);
+  ctx.fillStyle = finColor;
+  ctx.beginPath(); ctx.moveTo(-size*0.9,0); ctx.lineTo(-size*1.6,-size*0.6); ctx.lineTo(-size*1.6,size*0.6); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath(); ctx.ellipse(0,0,size,size*0.68,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = finColor;
+  ctx.beginPath(); ctx.moveTo(-size*0.1,-size*0.6); ctx.lineTo(size*0.25,-size*1.05); ctx.lineTo(size*0.45,-size*0.55); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#053E41';
+  ctx.beginPath(); ctx.arc(size*0.55,-size*0.12,size*0.14,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(size*0.58,-size*0.16,size*0.05,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawFood() {
+  for (const f of foods) {
+    const sx=f.x-camera.x, sy=f.y-camera.y;
+    if (sx<-20||sx>W+20||sy<-20||sy>H+20) continue;
+    ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(sx,sy,f.size,0,Math.PI*2); ctx.fill();
+  }
+}
+function drawCreatures() {
+  for (const c of creatures) {
+    const sx=c.x-camera.x, sy=c.y-camera.y;
+    if (sx<-80||sx>W+80||sy<-80||sy>H+80) continue;
+    drawFishShape(sx,sy,c.size,c.angle,c.color,c.color);
+  }
+}
+function drawDiscoFish() {
+  if (!discoFish) return;
+  const sx = discoFish.x-camera.x, sy = discoFish.y-camera.y;
+  if (sx<-60||sx>W+60||sy<-60||sy>H+60) return;
+  const color = `hsl(${discoFish.hue},85%,65%)`;
+  drawFishShape(sx,sy,22,discoFish.angle,color,color);
+  spawnSparkles(discoFish.x+rand(-10,10), discoFish.y+rand(-10,10), 1, color);
+}
+function drawPlayer() {
+  const sx = player.x-camera.x, sy = player.y-camera.y;
+  if (invincibleTimer > 0 && Math.floor(frame/4)%2===0) ctx.globalAlpha = 0.5;
+  drawFishShape(sx,sy,player.size,player.angle,'#FF8A66','#FF6B4A');
+  const s = player.size;
+  ctx.save(); ctx.translate(sx,sy); ctx.rotate(player.angle);
+  ctx.fillStyle = '#FFD98A';
+  for (const [px,py] of [[-s*0.2,-s*0.15],[-s*0.5,s*0.1],[-s*0.05,s*0.3]]) {
+    ctx.beginPath(); ctx.arc(px,py,s*0.08,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+function drawSquid() {
+  const sx = squid.x-camera.x, sy = squid.y-camera.y;
+  if (sx<-200||sx>W+200||sy<-200||sy>H+200) return;
+  ctx.save(); ctx.translate(sx,sy); ctx.rotate(squid.angle);
+  ctx.strokeStyle = '#3a1550'; ctx.lineWidth = squid.size*0.14; ctx.lineCap='round';
+  for (let i=-3;i<=3;i++) {
+    const offset = i*(squid.size*0.16);
+    const wig = Math.sin(squid.tentaclePhase+i)*squid.size*0.25;
+    ctx.beginPath(); ctx.moveTo(-squid.size*0.6, offset);
+    ctx.quadraticCurveTo(-squid.size*1.3, offset+wig, -squid.size*1.9, offset+wig*1.4);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#4B1E63';
+  ctx.beginPath(); ctx.ellipse(0,0,squid.size*0.75,squid.size*0.6,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#FFD98A';
+  ctx.beginPath(); ctx.arc(squid.size*0.35,-squid.size*0.15,squid.size*0.12,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#1a0a24';
+  ctx.beginPath(); ctx.arc(squid.size*0.4,-squid.size*0.15,squid.size*0.06,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  if (squid.attackTelegraph) {
+    const tx = squid.tentacleHitX-camera.x, ty = squid.tentacleHitY-camera.y;
+    const t = 1 - clamp(squid.telegraphTimer/45, 0, 1);
+    ctx.strokeStyle = `rgba(255,107,74,${0.3+t*0.5})`; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(tx,ty, 70*(1-t*0.3), 0, Math.PI*2); ctx.stroke();
+  }
+}
+function drawVignette() {
+  const grad = ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.75);
+  grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,0.35)');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+}
+
+// ---------------- Main loop ----------------
+function loop() {
+  if (!gameRunning) return;
+  frame++;
+  updatePlayer(); updateSeahorse(); updateFood(); updateCreatures();
+  updateDiscoFish(); updateChallenge(); updateSquid(); updateCamera(); updateParticles();
+  drawBackground(); drawFood(); drawCreatures(); drawDiscoFish(); drawSquid();
+  drawSeahorse(); drawPlayer(); drawParticles(); drawVignette();
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
