@@ -27,10 +27,6 @@
     font-size: 28px; transition: font-size 0.25s ease;
   }
   #livesWrap { margin-top: 6px; font-size: 20px; }
-  #slowStatus {
-    margin-top: 6px; font-size: 13px; font-weight: bold; color: #B98CE0;
-    opacity: 0; transition: opacity 0.2s;
-  }
 
   #warning, #challengeBanner, #bossBar {
     position: absolute; left: 50%; transform: translateX(-50%);
@@ -74,28 +70,6 @@
   button:active { transform: translateY(4px); box-shadow: 0 2px 0 #B8431F; }
   #controls { margin-top: 18px; font-size: 13px; color: #9fd6d2; }
 
-  #careerPoints { font-size: 13px; color: #FFD98A; margin-bottom: 10px; }
-  #skinSelector {
-    display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;
-    max-width: 480px; margin-bottom: 18px;
-  }
-  .skinBtn {
-    width: 54px; height: 54px; border-radius: 50%;
-    border: 3px solid rgba(255,217,138,0.35);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; position: relative; flex-shrink: 0;
-  }
-  .skinBtn.selected { border-color: #FFD98A; box-shadow: 0 0 10px rgba(255,217,138,0.7); }
-  .skinBtn.locked { opacity: 0.35; cursor: not-allowed; }
-  .skinBtn .lockIcon { position: absolute; font-size: 18px; }
-  .skinBtn canvas { pointer-events: none; }
-
-  #creditFooter {
-    position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
-    font-size: 11px; color: rgba(255,247,236,0.45); z-index: 25; pointer-events: none;
-    letter-spacing: 0.5px;
-  }
-
   /* On-screen D-pad */
   #dpad {
     position: absolute; bottom: 26px; left: 26px; z-index: 15;
@@ -128,7 +102,6 @@
       <span id="scoreLabel">SCORE</span>
       <span id="scoreVal">0</span>
       <div id="livesWrap">❤️❤️❤️</div>
-      <div id="slowStatus"></div>
     </div>
   </div>
 
@@ -155,8 +128,6 @@
     <p class="sub">Guide your fish with the arrows, WASD, on-screen arrows, or by touching/clicking the water.
     Eat food and smaller creatures to grow. Your seahorse friend swims with you and shields you once in a while.
     Watch for the disco fish — complete its challenge for bonus points. Grow big enough, and the squid will come for you.</p>
-    <div id="careerPoints">Career Points: 0 — earn points to unlock new skins!</div>
-    <div id="skinSelector"></div>
     <button id="startBtn">Start Swimming</button>
     <div id="controls">Arrow keys / WASD / on-screen arrows / tap-drag the water</div>
   </div>
@@ -174,8 +145,6 @@
     <p class="sub" style="font-size:18px; color:#FFD98A; margin-top:-8px;">Final score: <span id="victoryScore">0</span></p>
     <button id="victoryRetryBtn">Play Again</button>
   </div>
-
-  <div id="creditFooter">made by Isaac Clarke</div>
 </div>
 
 <script>
@@ -269,117 +238,11 @@ function initBubbles() {
   for (let i=0;i<70;i++) bubbles.push({ x: rand(0,WORLD_W), y: rand(0,WORLD_H), r: rand(2,8), speed: rand(0.2,0.6) });
 }
 
-// ---------------- Ocean floor environment (sand, coral, rocks) ----------------
-const SAND_HEIGHT = 150;
-const SAND_TOP = WORLD_H - SAND_HEIGHT;
-const CORAL_COLORS = ['#FF6F91','#FF9F80','#C77DFF','#FFD166'];
-let sandDots = [], coralPieces = [], rockPieces = [];
-function initEnvironment() {
-  sandDots = []; coralPieces = []; rockPieces = [];
-  for (let i=0;i<220;i++) sandDots.push({ x: rand(0,WORLD_W), y: rand(SAND_TOP+10, WORLD_H-8), r: rand(1,3) });
-  for (let i=0;i<28;i++) {
-    coralPieces.push({ x: rand(20,WORLD_W-20), y: SAND_TOP + rand(-6,10), scale: rand(0.7,1.5), color: CORAL_COLORS[Math.floor(rand(0,CORAL_COLORS.length))] });
-  }
-  const rockBandTop = WORLD_H*0.55;
-  for (let i=0;i<11;i++) rockPieces.push({ x: rand(-20,45), y: rand(rockBandTop, WORLD_H-10), r: rand(28,58) });
-  for (let i=0;i<11;i++) rockPieces.push({ x: rand(WORLD_W-45, WORLD_W+20), y: rand(rockBandTop, WORLD_H-10), r: rand(28,58) });
-}
-function drawCoral(x,y,scale,color) {
-  ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale);
-  ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(-8,-20,-4,-38); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(6,-18,14,-34); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(0,-14,0,-28); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-4,-38); ctx.quadraticCurveTo(-10,-44,-14,-50); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(14,-34); ctx.quadraticCurveTo(20,-40,26,-44); ctx.stroke();
-  ctx.restore();
-}
-function drawEnvironment() {
-  // sand band across the bottom of the world
-  const topScreen = SAND_TOP - camera.y;
-  if (topScreen < H) {
-    ctx.fillStyle = '#D9B77A';
-    ctx.fillRect(0-camera.x, topScreen, WORLD_W, SAND_HEIGHT+20);
-    ctx.fillStyle = 'rgba(150,110,55,0.35)';
-    for (const d of sandDots) {
-      const px = d.x-camera.x, py = d.y-camera.y;
-      if (px<-10||px>W+10||py<-10||py>H+10) continue;
-      ctx.beginPath(); ctx.arc(px,py,d.r,0,Math.PI*2); ctx.fill();
-    }
-    for (const c of coralPieces) {
-      const px = c.x-camera.x, py = c.y-camera.y;
-      if (px<-40||px>W+40||py<-70||py>H+40) continue;
-      drawCoral(px,py,c.scale,c.color);
-    }
-  }
-  // boundary rocks along the sides near the bottom
-  for (const r of rockPieces) {
-    const px = r.x-camera.x, py = r.y-camera.y;
-    if (px<-100||px>W+100||py<-100||py>H+100) continue;
-    ctx.fillStyle = '#5C6670';
-    ctx.beginPath(); ctx.ellipse(px,py,r.r,r.r*0.82,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    ctx.beginPath(); ctx.ellipse(px-r.r*0.2,py-r.r*0.25,r.r*0.4,r.r*0.28,0,0,Math.PI*2); ctx.fill();
-  }
-}
-
 // ---------------- Player ----------------
 let player, lives, invincibleTimer, shieldReady, shieldCooldown;
 function initPlayer() {
-  player = { x: WORLD_W/2, y: WORLD_H/2, vx:0, vy:0, angle:0, size:16, baseSpeed:3.8, skin: SKINS[selectedSkinIndex] };
+  player = { x: WORLD_W/2, y: WORLD_H/2, vx:0, vy:0, angle:0, size:16, baseSpeed:3.8 };
   lives = 3; invincibleTimer = 0; shieldReady = true; shieldCooldown = 0;
-}
-
-// ---------------- Skins ----------------
-const SKINS = [
-  { name: 'Classic Orange',  body: '#FF8A66', fin: '#FF6B4A', unlock: 0 },
-  { name: 'Teal Tang',       body: '#4FD1C9', fin: '#1E9E96', unlock: 150 },
-  { name: 'Golden Koi',      body: '#FFD24C', fin: '#E8A400', unlock: 350 },
-  { name: 'Purple Fin',      body: '#B98CE0', fin: '#7A4FB0', unlock: 600 },
-  { name: 'Coral Pink',      body: '#FF9FB2', fin: '#E9607D', unlock: 900 },
-  { name: 'Electric Blue',   body: '#4FA8FF', fin: '#1E6FCC', unlock: 1250 },
-  { name: 'Camo Green',      body: '#8FBF6B', fin: '#5C8C3E', unlock: 1650 },
-  { name: 'Shadow Fish',     body: '#3A3F4B', fin: '#20232B', unlock: 2100 },
-  { name: 'Silver Fin',      body: '#C9D3DA', fin: '#8A97A3', unlock: 2600 },
-  { name: 'Sunset Gradient', body: '#FF7E5F', fin: '#FEB47B', unlock: 3200 },
-  { name: 'Rainbow Scale',   body: 'RAINBOW', fin: 'RAINBOW', unlock: 3900 },
-  { name: 'Galaxy',          body: '#3B2A6E', fin: '#7A5FD8', unlock: 4700, sparkle: true },
-  { name: 'Golden Legendary',body: '#FFD700', fin: '#B8860B', unlock: 5600, sparkle: true }
-];
-let careerPoints = 0;
-let selectedSkinIndex = 0;
-
-function renderSkinSelector() {
-  document.getElementById('careerPoints').textContent =
-    `Career Points: ${Math.floor(careerPoints)} — earn points to unlock new skins!`;
-  const wrap = document.getElementById('skinSelector');
-  wrap.innerHTML = '';
-  SKINS.forEach((skin, i) => {
-    const unlocked = careerPoints >= skin.unlock;
-    const btn = document.createElement('div');
-    btn.className = 'skinBtn' + (unlocked ? '' : ' locked') + (i === selectedSkinIndex ? ' selected' : '');
-    btn.title = unlocked ? skin.name : `${skin.name} — unlocks at ${skin.unlock} career points`;
-    const body = skin.body === 'RAINBOW' ? `hsl(${(i*40)%360},80%,65%)` : skin.body;
-    btn.style.background = `radial-gradient(circle at 35% 30%, ${body}, ${skin.fin === 'RAINBOW' ? '#333' : skin.fin})`;
-    if (!unlocked) {
-      const lock = document.createElement('span');
-      lock.className = 'lockIcon';
-      lock.textContent = '🔒';
-      btn.appendChild(lock);
-    }
-    btn.addEventListener('click', () => {
-      if (!unlocked) return;
-      selectedSkinIndex = i;
-      renderSkinSelector();
-    });
-    wrap.appendChild(btn);
-  });
-}
-function showStartScreen() {
-  renderSkinSelector();
-  document.getElementById('startScreen').style.display = 'flex';
-  document.getElementById('gameOverScreen').style.display = 'none';
-  document.getElementById('victoryScreen').style.display = 'none';
 }
 
 // ---------------- Seahorse companion ----------------
@@ -415,73 +278,6 @@ function drawSeahorse() {
 let foods = [];
 function spawnFood() { foods.push({ x: rand(0,WORLD_W), y: rand(0,WORLD_H), size: rand(3,5), color: ['#F5D76E','#8ED1FC','#B5EAD7'][Math.floor(rand(0,3))] }); }
 function initFood() { foods = []; for (let i=0;i<90;i++) spawnFood(); }
-
-// ---------------- Jellyfish (always 4, avoid these) ----------------
-let jellyfish = [];
-const JELLY_COUNT = 4;
-const JELLY_SLOW_DURATION = 15 * 60; // 15 seconds
-let jellySlowTimer = 0;
-
-function spawnJellyOutOfView() {
-  // place far enough from the player/camera that it's not visible when it reappears
-  let x, y, tries = 0;
-  do {
-    x = rand(0, WORLD_W); y = rand(0, WORLD_H);
-    tries++;
-  } while (dist({x,y}, player) < 700 && tries < 20);
-  return { x, y, size: rand(16,22), angle: rand(0,Math.PI*2), speed: rand(0.3,0.6), wanderTimer: rand(0,100), bob: rand(0,Math.PI*2) };
-}
-function initJellyfish() {
-  jellyfish = [];
-  for (let i=0;i<JELLY_COUNT;i++) jellyfish.push(spawnJellyOutOfView());
-}
-function updateJellyfish() {
-  for (const j of jellyfish) {
-    j.wanderTimer--;
-    j.bob += 0.05;
-    if (j.wanderTimer <= 0) { j.angle += rand(-0.6,0.6); j.wanderTimer = rand(60,140); }
-    j.x += Math.cos(j.angle) * j.speed;
-    j.y += Math.sin(j.angle) * j.speed + Math.sin(j.bob) * 0.3;
-    j.x = clamp(j.x, j.size, WORLD_W - j.size);
-    j.y = clamp(j.y, j.size, WORLD_H - j.size);
-  }
-  for (let i = jellyfish.length-1; i>=0; i--) {
-    const j = jellyfish[i];
-    if (dist(j, player) < player.size*0.75 + j.size*0.7) {
-      jellySlowTimer = JELLY_SLOW_DURATION;
-      spawnSparkles(player.x, player.y, 14, '#B98CE0');
-      jellyfish[i] = spawnJellyOutOfView(); // it drifts off and a jellyfish still respawns elsewhere, keeping count at 4
-    }
-  }
-  if (jellySlowTimer > 0) {
-    jellySlowTimer--;
-    document.getElementById('slowStatus').style.opacity = '1';
-    document.getElementById('slowStatus').textContent = `🌊 Slowed! ${Math.ceil(jellySlowTimer/60)}s`;
-  } else {
-    document.getElementById('slowStatus').style.opacity = '0';
-  }
-}
-function drawJellyfish() {
-  for (const j of jellyfish) {
-    const sx = j.x-camera.x, sy = j.y-camera.y + Math.sin(j.bob)*3;
-    if (sx<-40||sx>W+40||sy<-40||sy>H+40) continue;
-    ctx.save(); ctx.translate(sx,sy);
-    ctx.globalAlpha = 0.75;
-    ctx.fillStyle = '#C7A0FF';
-    ctx.beginPath(); ctx.arc(0,0,j.size,Math.PI,0); ctx.fill();
-    ctx.fillStyle = 'rgba(199,160,255,0.35)';
-    for (let i=-2;i<=2;i++) {
-      const tx = i*(j.size*0.35);
-      const wig = Math.sin(j.bob + i)*4;
-      ctx.beginPath();
-      ctx.moveTo(tx, 0);
-      ctx.quadraticCurveTo(tx+wig, j.size*0.8, tx+wig*0.6, j.size*1.5);
-      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(199,160,255,0.5)'; ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-    ctx.restore();
-  }
-}
 
 // ---------------- Creatures ----------------
 let creatures = [];
@@ -533,16 +329,10 @@ function updateChallengeBanner() {
 // ---------------- Squid boss ----------------
 let squid, squidDefeated = false, bossMode = false;
 const SQUID_TRIGGER_SIZE = 110, SQUID_MAX_HEALTH = 5;
-const SQUID_MAX_ENERGY = 100;
-const SQUID_DRAIN_RATE = 100 / (5*60);   // burst lasts ~5 seconds
-const SQUID_RECOVER_RATE = 100 / (7*60); // recovers over ~7 seconds while tired/roaming
 function initSquid() {
   squid = {
     x: rand(0,WORLD_W), y: rand(0,WORLD_H), angle:0, size:95,
-    speed:1.4, huntSpeed:3.0, tentaclePhase:0,
-    state: 'roam',       // roam | burst | tired
-    energy: SQUID_MAX_ENERGY,
-    tiredTimer: 0,
+    speed:1.6, huntSpeed:3.0, tentaclePhase:0, state:'roam',
     roamTarget: { x: rand(0,WORLD_W), y: rand(0,WORLD_H) },
     health: SQUID_MAX_HEALTH, attackTimer: 90, attackTelegraph:false, telegraphTimer:0,
     tentacleHitX:0, tentacleHitY:0, tentacleReach:0
@@ -560,9 +350,9 @@ function addScore(v) {
 function updateLivesDisplay() { document.getElementById('livesWrap').textContent = '❤️'.repeat(Math.max(0,lives)); }
 
 function startGame() {
-  initPlayer(); initSeahorse(); initFood(); initJellyfish(); initCreatures(); initSquid(); initBubbles(); initEnvironment();
+  initPlayer(); initSeahorse(); initFood(); initCreatures(); initSquid(); initBubbles();
   score = 0; frame = 0; discoFish = null; challenge = null; discoRespawnTimer = 240;
-  squidDefeated = false; bossMode = false; jellySlowTimer = 0;
+  squidDefeated = false; bossMode = false;
   addScore(0); updateLivesDisplay();
   gameRunning = true;
   document.getElementById('startScreen').style.display = 'none';
@@ -574,22 +364,19 @@ function startGame() {
 }
 function endGame(message) {
   gameRunning = false;
-  careerPoints += Math.floor(score);
   document.getElementById('goMessage').textContent = message;
   document.getElementById('finalScore').textContent = Math.floor(score);
   document.getElementById('gameOverScreen').style.display = 'flex';
 }
 function winGame(message) {
   gameRunning = false;
-  careerPoints += Math.floor(score);
   document.getElementById('victoryMessage').textContent = message;
   document.getElementById('victoryScore').textContent = Math.floor(score);
   document.getElementById('victoryScreen').style.display = 'flex';
 }
 document.getElementById('startBtn').addEventListener('click', startGame);
-document.getElementById('retryBtn').addEventListener('click', showStartScreen);
-document.getElementById('victoryRetryBtn').addEventListener('click', showStartScreen);
-renderSkinSelector();
+document.getElementById('retryBtn').addEventListener('click', startGame);
+document.getElementById('victoryRetryBtn').addEventListener('click', startGame);
 
 // ---------------- Update: player ----------------
 function updatePlayer() {
@@ -606,8 +393,7 @@ function updatePlayer() {
   const len = Math.hypot(dx,dy);
   if (len > 0) { dx/=len; dy/=len; player.angle = Math.atan2(dy,dx); }
   const speedFactor = clamp(1.15 - player.size/300, 0.5, 1.15);
-  const slowFactor = jellySlowTimer > 0 ? 0.45 : 1;
-  const speed = player.baseSpeed * speedFactor * slowFactor;
+  const speed = player.baseSpeed * speedFactor;
   player.vx = dx*speed; player.vy = dy*speed;
   player.x = clamp(player.x+player.vx, player.size, WORLD_W-player.size);
   player.y = clamp(player.y+player.vy, player.size, WORLD_H-player.size);
@@ -710,39 +496,17 @@ function updateSquid() {
     bossMode = true;
     document.getElementById('bossBar').style.opacity = '1';
   }
-  const wantsToEngage = bossMode || d < 550;
+  if (bossMode) squid.state = 'hunt';
+  else if (d < 550) squid.state = 'hunt';
+  else if (d > 900) squid.state = 'roam';
 
-  // state transitions
-  if (squid.state === 'burst') {
-    squid.energy -= SQUID_DRAIN_RATE;
-    if (squid.energy <= 0) {
-      squid.energy = 0;
-      squid.state = 'tired';
-      squid.tiredTimer = rand(4*60, 6*60);
-      squid.attackTelegraph = false;
-      squid.tentacleReach = 0;
-    }
-  } else {
-    // roam / tired: recover energy, ignore the player
-    squid.energy = Math.min(SQUID_MAX_ENERGY, squid.energy + SQUID_RECOVER_RATE);
-    if (squid.state === 'tired') {
-      squid.tiredTimer--;
-      if (squid.tiredTimer <= 0) squid.state = 'roam';
-    }
-    if (squid.state === 'roam' && wantsToEngage && squid.energy >= SQUID_MAX_ENERGY * 0.6) {
-      squid.state = 'burst';
-      squid.attackTimer = 50;
-    }
-  }
-
-  if (squid.state === 'burst') {
+  if (squid.state === 'hunt') {
     const desiredDist = bossMode ? 140 : 0;
     const away = d < desiredDist;
     squid.angle = Math.atan2(player.y-squid.y, player.x-squid.x);
     const spd = bossMode ? (away ? -squid.huntSpeed*0.6 : squid.huntSpeed) : squid.huntSpeed;
     squid.x += Math.cos(squid.angle)*spd; squid.y += Math.sin(squid.angle)*spd;
   } else {
-    // tired or roam: drift away slowly, disinterested
     if (dist(squid, squid.roamTarget) < 60) squid.roamTarget = { x: rand(200,WORLD_W-200), y: rand(200,WORLD_H-200) };
     squid.angle = Math.atan2(squid.roamTarget.y-squid.y, squid.roamTarget.x-squid.x);
     squid.x += Math.cos(squid.angle)*squid.speed; squid.y += Math.sin(squid.angle)*squid.speed;
@@ -751,27 +515,25 @@ function updateSquid() {
   squid.y = clamp(squid.y, squid.size, WORLD_H-squid.size);
   squid.tentaclePhase += 0.12;
 
-  document.getElementById('warning').style.opacity = (!bossMode && squid.state === 'burst' && d < 500) ? '1' : '0';
+  document.getElementById('warning').style.opacity = (!bossMode && d < 500) ? '1' : '0';
 
   if (bossMode) {
-    if (squid.state === 'burst') {
-      squid.attackTimer--;
-      if (squid.attackTimer <= 0 && !squid.attackTelegraph) {
-        squid.attackTelegraph = true; squid.telegraphTimer = 45;
-        squid.tentacleHitX = player.x; squid.tentacleHitY = player.y;
+    squid.attackTimer--;
+    if (squid.attackTimer <= 0 && !squid.attackTelegraph) {
+      squid.attackTelegraph = true; squid.telegraphTimer = 45;
+      squid.tentacleHitX = player.x; squid.tentacleHitY = player.y;
+    }
+    if (squid.attackTelegraph) {
+      squid.telegraphTimer--;
+      squid.tentacleReach = lerp(squid.tentacleReach, squid.size*2.2, 0.15);
+      if (squid.telegraphTimer <= 0) {
+        const hitDist = dist({x:squid.tentacleHitX,y:squid.tentacleHitY}, player);
+        if (hitDist < 70) damagePlayer("The squid's tentacle got you! Watch for the glowing warning before it strikes.");
+        squid.attackTelegraph = false; squid.tentacleReach = 0; squid.attackTimer = 110;
       }
-      if (squid.attackTelegraph) {
-        squid.telegraphTimer--;
-        squid.tentacleReach = lerp(squid.tentacleReach, squid.size*2.2, 0.15);
-        if (squid.telegraphTimer <= 0) {
-          const hitDist = dist({x:squid.tentacleHitX,y:squid.tentacleHitY}, player);
-          if (hitDist < 70) damagePlayer("The squid's tentacle got you! Watch for the glowing warning before it strikes.");
-          squid.attackTelegraph = false; squid.tentacleReach = 0; squid.attackTimer = 110;
-        }
-      }
-      if (squid.attackTelegraph && d < player.size+squid.size*0.5 && player.size > 70) {
-        squid.health -= 0.04; spawnSparkles(squid.x, squid.y, 3, '#8B2FA0');
-      }
+    }
+    if (squid.attackTelegraph && d < player.size+squid.size*0.5 && player.size > 70) {
+      squid.health -= 0.04; spawnSparkles(squid.x, squid.y, 3, '#8B2FA0');
     }
     const pct = clamp(squid.health/SQUID_MAX_HEALTH, 0, 1);
     document.getElementById('bossBarInner').style.width = (pct*100)+'%';
@@ -781,7 +543,7 @@ function updateSquid() {
       winGame('Your fish grew big and brave enough to drive off the squid for good!');
     }
   } else {
-    if (squid.state === 'burst' && d < player.size*0.8 + squid.size*0.55) {
+    if (d < player.size*0.8 + squid.size*0.55) {
       damagePlayer("The squid got you! It's always bigger than you at first — grow more before facing it.");
     }
   }
@@ -845,13 +607,7 @@ function drawDiscoFish() {
 function drawPlayer() {
   const sx = player.x-camera.x, sy = player.y-camera.y;
   if (invincibleTimer > 0 && Math.floor(frame/4)%2===0) ctx.globalAlpha = 0.5;
-  const skin = player.skin || SKINS[0];
-  let bodyColor = skin.body, finColor = skin.fin;
-  if (bodyColor === 'RAINBOW') {
-    bodyColor = `hsl(${frame*2 % 360},80%,65%)`;
-    finColor = `hsl(${(frame*2+40) % 360},80%,55%)`;
-  }
-  drawFishShape(sx,sy,player.size,player.angle,bodyColor,finColor);
+  drawFishShape(sx,sy,player.size,player.angle,'#FF8A66','#FF6B4A');
   const s = player.size;
   ctx.save(); ctx.translate(sx,sy); ctx.rotate(player.angle);
   ctx.fillStyle = '#FFD98A';
@@ -860,14 +616,10 @@ function drawPlayer() {
   }
   ctx.restore();
   ctx.globalAlpha = 1;
-  if (skin.sparkle && frame % 6 === 0) {
-    spawnSparkles(player.x - Math.cos(player.angle)*s, player.y - Math.sin(player.angle)*s, 1, '#FFD98A');
-  }
 }
 function drawSquid() {
   const sx = squid.x-camera.x, sy = squid.y-camera.y;
   if (sx<-200||sx>W+200||sy<-200||sy>H+200) return;
-  if (squid.state === 'tired') ctx.globalAlpha = 0.55;
   ctx.save(); ctx.translate(sx,sy); ctx.rotate(squid.angle);
   ctx.strokeStyle = '#3a1550'; ctx.lineWidth = squid.size*0.14; ctx.lineCap='round';
   for (let i=-3;i<=3;i++) {
@@ -890,7 +642,6 @@ function drawSquid() {
     ctx.strokeStyle = `rgba(255,107,74,${0.3+t*0.5})`; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(tx,ty, 70*(1-t*0.3), 0, Math.PI*2); ctx.stroke();
   }
-  ctx.globalAlpha = 1;
 }
 function drawVignette() {
   const grad = ctx.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,H*0.75);
@@ -902,9 +653,9 @@ function drawVignette() {
 function loop() {
   if (!gameRunning) return;
   frame++;
-  updatePlayer(); updateSeahorse(); updateFood(); updateJellyfish(); updateCreatures();
+  updatePlayer(); updateSeahorse(); updateFood(); updateCreatures();
   updateDiscoFish(); updateChallenge(); updateSquid(); updateCamera(); updateParticles();
-  drawBackground(); drawEnvironment(); drawFood(); drawJellyfish(); drawCreatures(); drawDiscoFish(); drawSquid();
+  drawBackground(); drawFood(); drawCreatures(); drawDiscoFish(); drawSquid();
   drawSeahorse(); drawPlayer(); drawParticles(); drawVignette();
   requestAnimationFrame(loop);
 }
